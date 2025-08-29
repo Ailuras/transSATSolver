@@ -119,6 +119,8 @@ transSATSolver/
 │   └── utils/                   # Utilities
 │       ├── configurator.py      # Configuration system
 │       └── utils.py             # General utilities
+├── tests/                       # Unit tests
+│   └── sat_solver/              # SAT solver tests
 ├── configs/                     # Training configurations
 ├── data/                        # Data directory
 │   └── datasets/                # SAT problem datasets
@@ -127,7 +129,10 @@ transSATSolver/
 │   ├── models/                  # Saved model checkpoints
 │   ├── logs/                    # Training logs
 │   └── evaluations/             # Evaluation results
-└── docs/                        # Documentation and research papers
+├── docs/                        # Documentation and research papers
+├── setup.py                     # Project installation script
+├── environment.yml              # Conda environment specification
+└── requirements.txt             # Python package requirements
 ```
 
 ### Key Components
@@ -147,10 +152,14 @@ transSATSolver/
 
 ### Testing
 
-Run solver tests:
+Run all tests:
 ```bash
-cd src/models/sat_solver
 python -m pytest tests/
+```
+
+Run specific SAT solver tests:
+```bash
+python -m pytest tests/sat_solver/
 ```
 
 Verify trace generation:
