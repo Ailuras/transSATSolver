@@ -1,7 +1,7 @@
 
-# Transformer in SAT Solving
+# Transformer-based SAT Solver
 
-This repository contains code for training and evaluating a GPT-based model on SAT (Satisfiability) problem datasets. The model classifies SAT and UNSAT problems using the Hugging Face transformers library.
+This repository implements transformer models (GPT2/LLaMA) for SAT (Boolean Satisfiability) problem solving. The project trains models to classify CNF formulas as SAT or UNSAT using execution traces from DPLL/CDCL solvers.
 
 ---
 
@@ -21,12 +21,12 @@ To set up the environment, follow these steps:
 
 ## Datasets
 
-Each dataset has its corresponding folder in the `datasets/` directory. These folders typically contain scripts for downloading and preparing the datasets.
+Each dataset has its corresponding folder in the `data/datasets/` directory. These folders contain scripts for downloading and preparing the datasets.
 
-To prepare a dataset, navigate to its directory and run `prepare.py`. For example, to prepare the `SAT_6_10` dataset:
+To prepare a dataset, navigate to its directory and run `prepare.py`. For example:
 
    ```bash
-   cd datasets/SAT_6_10
+   cd data/datasets/SAT_6_10_Random_State_Large
    python prepare.py
    ```
 
@@ -42,11 +42,13 @@ Training configurations are stored as Python files in the `configs/` directory. 
 - **Model save path** (with or without a timestamp)
 - **Context size** for the model
 
-To create a new training configuration, add a new Python file in `configs/` and define the necessary parameters. A list of commonly used configurable parameters can be found in the `### Parameters ###` section of `gpt_train.py`, including:
+To create a new training configuration, add a new Python file in `configs/` and define the necessary parameters. A list of commonly used configurable parameters can be found in the `### Parameters ###` section of `src/core/train.py`, including:
 
 - `out_dir`: The base path to save the model. A timestamp is added by default to avoid overwriting; to disable this, set `append_timestamp=False`.
 - `block_size`: The context size for the model.
-- `dataset`: The training dataset, usually a directory in `datasets/`.
+- `dataset`: The training dataset, usually a directory in `data/datasets/`.
+- `model`: Architecture type ("gpt2" or "llama")
+- `state_trace`: Include solver state traces in training data
 
 (This method is adapted from nanoGPT.)
 
@@ -55,16 +57,16 @@ To create a new training configuration, add a new Python file in `configs/` and 
 To train a model using a basic configuration, use the following command:
 
    ```bash
-   python gpt_train.py --model_name llama-70M --train_file path/to/train.txt
+   python src/core/train.py --model_name llama-70M --train_file path/to/train.txt
    ```
 
 To use custom hyperparameters, specify them in the command:
 
    ```bash
-   python gpt_train.py configs/[YOUR_TRAINING_CONFIG].py --epochs=12
+   python src/core/train.py configs/[YOUR_TRAINING_CONFIG].py --epochs=12
    ```
 
-If you encounter an `AssertionError`, check for issues like spaces instead of `=` in the parameter assignments. You can debug using `configurator.py` to locate the error.
+If you encounter an `AssertionError`, check for issues like spaces instead of `=` in the parameter assignments. You can debug using `src/utils/configurator.py` to locate the error.
 
 ---
 
@@ -75,23 +77,93 @@ The evaluation process focuses on measuring the model's accuracy in predicting S
 To evaluate a model on a dataset, use:
 
    ```bash
-   python eval.py --dataset=[Dataset Path] --model_dir=[Model Directory] --num_samples=[Number of Test Samples]
+   python src/core/evaluator.py --dataset=[Dataset Path] --model_dir=[Model Directory] --num_samples=[Number of Test Samples]
    ```
 
 *Note*: Evaluation can be slower than training since token generation occurs incrementally and without batching. Typically, `num_samples` is set to 100 for initial evaluation.
 
 ### Batch Evaluation
 
-For batch evaluation on multiple `.txt` files, use `folder_eval.py`:
+For batch evaluation on multiple models, use the scripts in `scripts/`:
 
 - **Linux**:
 
    ```bash
-   ./folder_eval.sh ./model_checkpoints/6_10_random_ ./datasets/SAT_var_eval > 6_10_random.txt
+   ./scripts/folder_eval.sh ./results/models/6_10_random_ ./data/datasets/SAT_var_eval > results/6_10_random.txt
    ```
 
 - **Windows**:
 
    ```bash
-   python folder_eval.py models/sat-llama ./datasets/Large_500k_SAT_11_15_marginal_large results.txt
+   python src/models/parat/folder_eval.py results/models/sat-llama ./data/datasets/Large_500k_SAT_11_15_marginal_large results.txt
    ```
+
+---
+
+## Project Architecture
+
+### Directory Structure
+
+```
+transSATSolver/
+├── src/                          # Source code
+│   ├── core/                     # Core training and evaluation
+│   │   ├── train.py             # Main training script
+│   │   ├── trainer.py           # Custom HuggingFace trainer
+│   │   └── evaluator.py         # Model evaluation
+│   ├── dataset/                 # Data handling
+│   │   └── sat_dataset.py       # Custom SAT dataset and tokenizer
+│   ├── models/                  # Model implementations
+│   │   ├── parat/               # PARAT transformer implementation
+│   │   └── sat_solver/          # SAT solver implementations (DPLL/CDCL)
+│   └── utils/                   # Utilities
+│       ├── configurator.py      # Configuration system
+│       └── utils.py             # General utilities
+├── configs/                     # Training configurations
+├── data/                        # Data directory
+│   └── datasets/                # SAT problem datasets
+├── scripts/                     # Batch processing scripts
+├── results/                     # Training outputs
+│   ├── models/                  # Saved model checkpoints
+│   ├── logs/                    # Training logs
+│   └── evaluations/             # Evaluation results
+└── docs/                        # Documentation and research papers
+```
+
+### Key Components
+
+- **src/dataset/sat_dataset.py**: Custom tokenizer and dataset classes for SAT problem data
+- **src/core/trainer.py**: Custom HuggingFace trainer for SAT-specific training
+- **src/core/train.py**: Main training script with configurable parameters
+- **src/core/evaluator.py**: Model evaluation with SAT/UNSAT classification metrics
+- **src/utils/utils.py**: Utility functions including custom stopping criteria and model loading
+
+### SAT Solver Module (`src/models/sat_solver/`)
+
+- **generate_formula.py**: Random SAT formula generation
+- **dpll.py/cdcl.py**: SAT solver implementations
+- **trace_verify.py**: Execution trace validation
+- Batch scripts for data generation: `batch_generate_data.sh`, `batch_solve_dpll.sh`
+
+### Testing
+
+Run solver tests:
+```bash
+cd src/models/sat_solver
+python -m pytest tests/
+```
+
+Verify trace generation:
+```bash
+cd src/models/sat_solver  
+python trace_verify.py
+```
+
+### Data Format
+
+SAT problems are stored as text with format:
+```
+[CNF formula] [SEPARATOR] [execution trace] [SAT/UNSAT]
+```
+
+The custom tokenizer handles logical operators and solver-specific tokens.

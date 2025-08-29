@@ -118,3 +118,4 @@ Verify trace generation:
 cd sat_solver  
 python trace_verify.py
 ```
+- 我的conda环境为HF_SAT，安装python库时尽量使用mamba。
